@@ -6,20 +6,15 @@ Using these notes to get started:
 
 - [Developer Setup](https://hudi.apache.org/contribute/developer-setup)
 
-What I'd like to see:
+Questions:
 
 - Can I use the docker that "comes with" Intellij?
-- The Intellij setup is way too complicated.
 - This [Developer Setup](https://hudi.apache.org/contribute/developer-setup)
   guide recommends "building as per instructions on Spark quickstart or Flink
   quickstart".  The [Spark quickstart
   guide](https://hudi.apache.org/docs/quick-start-guide/) links
   [here](https://spark.apache.org/downloads) for setting up Spark, which asks
   user to choolse a package type.  Which package type should be used?
-
-
-to follow spark setup.
-
 
 ### My steps
 
