@@ -10,23 +10,70 @@
 
 ## My Progress
 
-### 2023-12-30 Docker demo
+
+### 2023-12-30 Docker demo use IN PROGRESS
+
+CRAP: SET JAVA_HOME !!!!
+
+Use `kcat` or `kafkacat` to put data into kafka.
+
+Use Hoodie Streamer to stream from kafka to Hudi tables.
+
+`spark-submit` failed bc file
+`docker/hoodie/hadoop/hive_base/target/hoodie-utilities.jar` does not exist in
+my built source tree. Aha.. the script `docker/build_local_docker_images.sh` has
+commands to build them, but also recommends getting them from docker hub.
+
+Maybe I skipped this step!
+
+```
+mvn clean package -Pintegration-tests -DskipTests
+```
+
+The `docker/build_local_docker_images.sh` script has this:
+
+```
+mvn pre-integration-test -DskipTests -Ddocker.compose.skip=true -Ddocker.build.skip=false
+```
+
+But you can also get them from docker hub (HOW?)
+
+
+### 2023-12-30 Docker demo setup
 
 https://hudi.apache.org/docs/docker_demo
 
-Installed jq and various docker packages:
-
+Installed `jq`:
 ```
 sudo apt install jq
-sudo apt install docker docker-compose
 ```
+
+Installed docker.  See `mynotes docker` on installing docker.
 
 In hudi src:
 
 ```
 cd docker
-./setup_demo.sh  # as root, as user?
+sudo ./setup_demo.sh   # should be able to do this as user?
 ```
+
+Stop demo:
+
+```
+HUDI_WS=/home/alex/github/alexttx/hudi sudo -E docker-compose \
+    -f /home/alex/github/alexttx/hudi/docker/compose/docker-compose_hadoop284_hive233_spark244.yml \
+    down
+```
+
+Start demo:
+```
+HUDI_WS=/home/alex/github/alexttx/hudi sudo -E docker-compose \
+    -f /home/alex/github/alexttx/hudi/docker/compose/docker-compose_hadoop284_hive233_spark244.yml \
+    up
+```
+
+
+
 
 
 
