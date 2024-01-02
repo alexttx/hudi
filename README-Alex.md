@@ -10,6 +10,26 @@
 
 ## My Progress
 
+### 2024-01-02 TLDR Recipe to build and run docker demo
+
+Ensure Maven uses Java 8: `mvn -v`
+
+Clean repo and build:
+```
+mvn clean package -DskipTests
+mvn pre-integration-test -DskipTests -Ddocker.compose.skip=true -Ddocker.build.skip=false
+cd docker
+sudo ./setup_demo.sh
+```
+
+Error:
+```
+Unable to load native-hadoop library for your platform... \
+    using builtin-java classes where applicable
+Local jar /var/hoodie/ws/docker/hoodie/hadoop/hive_base/target/hoodie-utilities.jar does not exist
+```
+
+
 
 ### 2023-12-30 Docker demo use IN PROGRESS
 
@@ -28,12 +48,14 @@ Maybe I skipped this step!
 
 ```
 mvn clean package -Pintegration-tests -DskipTests
+# Failed
 ```
 
 The `docker/build_local_docker_images.sh` script has this:
 
 ```
 mvn pre-integration-test -DskipTests -Ddocker.compose.skip=true -Ddocker.build.skip=false
+# Passed
 ```
 
 But you can also get them from docker hub (HOW?)
@@ -72,11 +94,6 @@ HUDI_WS=/home/alex/github/alexttx/hudi sudo -E docker-compose \
     up
 ```
 
-
-
-
-
-
 ### 2023-12-29 Installed Spark 3.4 w/o Hadoop
 
 WARNING: Not yet sure if this is the right setup for using Spark w/ Hudi
@@ -114,6 +131,26 @@ export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export PATH=$JAVA_HOME/bin:$PATH
 mvn -v
 mvn clean package -DskipTests
+```
+
+Relying on JAVA_HOME and PATH is error prone. A safer method to force use of
+Java 8 is to change the system's default.
+
+
+```
+sudo  update-alternatives --config java
+```
+
+See
+[here](https://documentation.suse.com/sles/15-SP1/html/SLES-all/cha-update-alternative.html)
+for more info.
+
+**HOLY SHIT that didn't work!***  For the love of god, just purge other Java installs:
+
+```
+sudo apt purge openjdk-11*
+sudo apt purge openjdk-18*
+...
 ```
 
 ## References
