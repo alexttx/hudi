@@ -8,65 +8,67 @@
 
 ### 2024-01-04 Custom docker demo
 
+Build:
 ```
 git co alex
 mvn clean package -Pintegration-tests -DskipTests -Dspark2.4 -Dscala-2.11
+```
+
+Bring up cluster:
+```
 cd docker
 sudo ./setup_demo.sh
+```
 
-cat demo/data/batch_1.json | kcat -b kafkabroker -t stock_ticks -P
+Load some data into Kafka and verify:
+```
+yyyy=2020
+dd=1
+mm=1
+hh=9
+./stock_ticker.py -y $yyyy -d $dd -m $mm -t $hh | kcat -b kafkabroker -t stock_ticks -P
 kcat -b kafkabroker -L -J | jq -C .
 ```
 
-In adhoc-1: `docker exec -it adhoc-2 /bin/bash`:
+Ingest from Kafkaa to COW and MOR tables in HDFS
 ```
-# Ingest to COW table in HDFS
-spark-submit \
-  --class org.apache.hudi.utilities.streamer.HoodieStreamer $HUDI_UTILITIES_BUNDLE \
-  --table-type COPY_ON_WRITE \
-  --source-class org.apache.hudi.utilities.sources.JsonKafkaSource \
-  --source-ordering-field ts  \
-  --target-base-path /user/hive/warehouse/stock_ticks_cow \
-  --target-table stock_ticks_cow --props /var/demo/config/kafka-source.properties \
-  --schemaprovider-class org.apache.hudi.utilities.schema.FilebasedSchemaProvider
-
-
-# Ingest to MOR table in HDFS
-spark-submit \
-  --class org.apache.hudi.utilities.streamer.HoodieStreamer $HUDI_UTILITIES_BUNDLE \
-  --table-type MERGE_ON_READ \
-  --source-class org.apache.hudi.utilities.sources.JsonKafkaSource \
-  --source-ordering-field ts \
-  --target-base-path /user/hive/warehouse/stock_ticks_mor \
-  --target-table stock_ticks_mor \
-  --props /var/demo/config/kafka-source.properties \
-  --schemaprovider-class org.apache.hudi.utilities.schema.FilebasedSchemaProvider \
-  --disable-compaction
-
-# Sync COW table Hive
-/var/hoodie/ws/hudi-sync/hudi-hive-sync/run_sync_tool.sh \
-  --jdbc-url jdbc:hive2://hiveserver:10000 \
-  --user hive \
-  --pass hive \
-  --partitioned-by dt \
-  --base-path /user/hive/warehouse/stock_ticks_cow \
-  --database default \
-  --table stock_ticks_cow \
-  --partition-value-extractor org.apache.hudi.hive.SlashEncodedDayPartitionValueExtractor
-
-# Sync MORE table with Hive
-/var/hoodie/ws/hudi-sync/hudi-hive-sync/run_sync_tool.sh \
-  --jdbc-url jdbc:hive2://hiveserver:10000 \
-  --user hive \
-  --pass hive \
-  --partitioned-by dt \
-  --base-path /user/hive/warehouse/stock_ticks_mor \
-  --database default \
-  --table stock_ticks_mor \
-  --partition-value-extractor org.apache.hudi.hive.SlashEncodedDayPartitionValueExtractor
-
+sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-cow.sh
+sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-mor.sh
 ```
 
+See tables in HDFS:
+```
+sudo docker exec -it adhoc-1 hadoop --config /etc/hadoop fs -ls -R -h /user/hive/warehouse/stock\*/$yyyy
+```
+
+Sync COW and MOR tables with Hive:
+```
+sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/sync-cow.sh
+sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/sync-mor.sh
+```
+
+Run Hive queries:
+```
+sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/hive-queries.sh
+```
+
+Load next batch of data into Kafka:
+```
+(( hh += 1 ))
+./stock_ticker.py -y $yyyy -d $dd -m $mm -t $hh | kcat -b kafkabroker -t stock_ticks -P
+kcat -b kafkabroker -L -J | jq -C .
+```
+
+Ingest into HDFS:
+```
+sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-cow.sh
+sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-mor.sh
+```
+
+See data in HDFS, there are now two parque files per table:
+```
+sudo docker exec -it adhoc-1 hadoop --config /etc/hadoop fs -ls -R -h /user/hive/warehouse/stock\*/$yyyy
+```
 
 
 ### 2024-01-02 Run docker demo
