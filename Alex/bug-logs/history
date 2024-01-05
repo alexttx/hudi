@@ -1,0 +1,20 @@
+11890  01/04-20:06 #a=1; b=3482; while true; do (( n = (b+a)/2 )); log=$(printf "log_%04d.txt" $n); printf "Range %4d  %4d  %4d  -> %s: " $a $n $b $log; if (( a == b )); then echo done; break; fi; bash xx.sh $n > $log 2>&1; pf=$(tail $log | grep -c supergroup.*parquet); if (( pf == 1 )); then echo pass, go down; b=$n; else echo fail, go up; a=$n; fi; done
+11891  01/04-20:06 rm \log*txt
+11892  01/04-20:06 /bin/rm log*txt
+11893  01/04-20:06 a=1; b=3482; while true; do (( n = (b+a)/2 )); log=$(printf "log_%04d.txt" $n); printf "Range %4d  %4d  %4d  -> %s: " $a $n $b $log; if (( a == b )); then echo done; break; fi; bash xx.sh $n > $log 2>&1; pf=$(tail $log | grep -c supergroup.*parquet); if (( pf == 1 )); then echo pass, go down; b=$n; else echo fail, go up; a=$n; fi; done
+11894  01/04-20:37 ll
+11895  01/04-20:37 rm log_1869.txt
+11896  01/04-20:38 ls -ltr 
+11897  01/04-20:38 ll
+11898  01/04-20:39 grep supergroup.*parque log_*
+11899  01/04-20:39 for f in log_*; do banner $f; grep supergroup.*parque $f; done
+11900  01/04-20:39 for f in log_*; do banner $f; grep supergroup.*parque $f; done | less
+11901  01/04-20:39 for f in log_*; do banner $f; tail $f | grep supergroup; done | less
+11902  01/04-20:39 for f in log_*; do tail -v $f | grep supergroup; done | less
+11903  01/04-20:40 for f in log_*; do banner $f; tail $f | grep supergroup; done | less
+11904  01/04-20:40 A=1862
+11905  01/04-20:40 B=1870
+11906  01/04-20:41 a=1862; b=1870; while true; do (( n = (b+a)/2 )); log=$(printf "log_%04d.txt" $n); printf "Range %4d  %4d  %4d  -> %s: " $a $n $b $log; if (( b - a <= 1 )); then echo done; break; fi; bash xx.sh $n > $log 2>&1; pf=$(tail $log | grep -c supergroup.*parquet); if (( pf == 1 )); then echo pass, go down; b=$n; else echo fail, go up; a=$n; fi; done
+11907  01/04-20:52 mkdir bug-logs
+11908  01/04-20:52 mv log_*txt xx.sh bug-logs/
+11909  01/04-20:52 h > bug-logs/history

@@ -64,7 +64,8 @@ def help(argparser):
     argparser.print_help()
     pass
 
-TEMPLATE_FILE = "stock_ticker_template.json"
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+TEMPLATE_FILE = os.path.join(SCRIPT_DIR,"stock_ticker_template.json")
 YYYY = 2020
 MM = 1
 DD = 1
