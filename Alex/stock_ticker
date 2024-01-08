@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+DIR=$(readlink -m "${BASH_SOURCE[0]}"/..)
+CMD=$(basename "${BASH_SOURCE[0]}")
+
+eval "$(/home/alex/miniconda3/bin/conda shell.bash hook)"
+conda activate mypandas
+python3 "$DIR"/$CMD.py "$@"
