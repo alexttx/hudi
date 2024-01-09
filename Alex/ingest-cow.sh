@@ -18,5 +18,3 @@ spark-submit \
   --target-table "$table" \
   --props /var/demo/config/kafka-source.properties \
   --schemaprovider-class org.apache.hudi.utilities.schema.FilebasedSchemaProvider
-
-exit

@@ -31,8 +31,8 @@ kcat -b kafkabroker -L -J | jq -C .
 
 Ingest from Kafka to COW and MOR tables in HDFS
 ```
-docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-cow.sh
-docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-mor.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest.sh stock_ticks
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest.sh -m stock_ticks
 ```
 
 See tables in HDFS:
