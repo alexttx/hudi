@@ -26,7 +26,9 @@ except:
     pass
 
 DEFAULT_INTERVAL = 15
-DEFAULT_DIGITS = 2
+DEFAULT_ROUNDING = 2
+DEFAULT_SEED = 1234
+
 
 
 # open a possibly compressed file
@@ -71,21 +73,103 @@ def help(argparser):
     argparser.print_help()
     pass
 
+# Example input record (a pandas Series object):
+#
+#    Date         2020-06-01
+#    Open         182.539993
+#    High              183.0
+#    Low          181.460007
+#    Close        182.830002
+#    Adj Close    177.155167
+#    Volume         22622400
+#    Name: 355, dtype: object
+#
+# Example output records w/ hudify == False, interval == 60, and rounding == 2:
+#
+#                        ts symbol    open    high     low   close
+#    0  2020-06-01 09:30:00   MSFT  182.54  183.00  181.46  182.83
+#    1  2020-06-01 10:30:00   MSFT  182.63  181.75  182.33  182.72
+#    2  2020-06-01 11:30:00   MSFT  182.49  181.63  182.89  181.75
+#    3  2020-06-01 12:30:00   MSFT  182.50  182.11  182.16  182.05
+#    4  2020-06-01 13:30:00   MSFT  181.99  181.66  181.91  182.55
+#    5  2020-06-01 14:30:00   MSFT  182.56  182.92  182.27  182.33
+#    6  2020-06-01 15:30:00   MSFT  182.56  182.65  181.72  181.54
+#
+# If hudify == True, the following columns are added:
+#
+#   "date":   "2020/06/01",
+#   "year":   "2020",
+#   "month":  "06",
+#   "day":    "01",
+#   "key":    "MSFT_2020-06-01 09",  # YYYY-MM-DD HH
+#   "volume":  911533,
+#
+def expand(symbol, record, interval, rounding, rng, hudify):
 
-EXAMPLE_RECORD = {
-    "volume":  483951,
-    "symbol": "MSFT",
-    "ts":     "2018-08-31 09:30:00",
-    "month":  "08",
-    "high":    111.74,
-    "low":     111.55,
-    "open":    111.55,
-    "close":   111.72,
-    "key":     "MSFT_2018-08-31 09",
-    "year":    2018,
-    "date":   "2018/08/31",
-    "day":    "31",
-}
+    yyyy_mm_dd = record['Date']
+    op = record['Open']
+    hi = record['High']
+    lo = record['Low']
+    cl = record['Close']
+
+    price_base = lo
+    price_range = hi - lo
+
+    minutes_start =  9 * 60 + 30  #  9:30
+    minutes_end   = 16 * 60       # 16:00
+
+    def fmt_timestamp(date, minutes):
+        hh = int(minutes / 60)
+        mm = minutes % 60
+        return f"{date} {hh:02}:{mm:02}:00"
+
+    index = [fmt_timestamp(yyyy_mm_dd,m) for m in range(minutes_start, minutes_end, interval)]
+    entries = len(index)
+
+    op_values = [ round(price_base + price_range * rng.random(), rounding) for i in range(entries) ]
+    hi_values = [ round(price_base + price_range * rng.random(), rounding) for i in range(entries) ]
+    lo_values = [ round(price_base + price_range * rng.random(), rounding) for i in range(entries) ]
+    cl_values = [ round(price_base + price_range * rng.random(), rounding) for i in range(entries) ]
+
+    # This is kind of a cheat, but has the nice property that the original
+    # input row is preserved in the first output row of the expanded dataframe.
+    op_values[0] = round(op, rounding)
+    hi_values[0] = round(hi, rounding)
+    lo_values[0] = round(lo, rounding)
+    cl_values[0] = round(cl, rounding)
+
+    data = {
+        'symbol':[symbol]*entries,
+        'open': op_values,
+        'high': hi_values,
+        'low': lo_values,
+        'close': cl_values,
+        'volume': [ int(r * 1000000) for r in rng.random(size=entries) ]
+    }
+
+    if hudify:
+
+        def fmt_hudi_key(symbol, yyyy_mm_dd, minutes):
+            hh = int(minutes / 60)
+            return f"{symbol}_{yyyy_mm_dd} {hh:02}"
+
+        yyyy = yyyy_mm_dd[0:4]
+        mm = yyyy_mm_dd[5:7]
+        dd = yyyy_mm_dd[8:10]
+        hudi_date = f"{yyyy}/{mm}/{dd}"
+        hudi_keys = [fmt_hudi_key(symbol, yyyy_mm_dd, m) for m in range(minutes_start, minutes_end, interval)]
+
+        data["date"] = hudi_date
+        data["year"] = int(yyyy)
+        data["month"] = mm
+        data["day"] = dd
+        data["key"] = hudi_keys
+        pass
+
+    df = pd.DataFrame(index=index, data=data)
+    df.index.name = 'ts'
+    return [True, df]
+
 
 # Example DataFrame as read from CSV file:
 #
@@ -99,12 +183,6 @@ class Stock:
     def __init__(self, name, fname):
         self.name = name
         self.filename = fname
-        seed = 17
-        for i in name:
-            seed = seed * ord(i)
-            pass
-        self.seed = seed
-        self.rng = np.random.default_rng(seed)
         # Load w/ index column set to Date so we can check the dates are unique
         # and monotonicially increasing, then reset the index.
         df = pd.read_csv(fname, index_col='Date')
@@ -128,53 +206,6 @@ class Stock:
 
     def end_date(self):
         return self.df.index[-1]
-
-    def expand(self, date, interval, rounding):
-        if not date in self.df.index:
-            return [False, False]
-
-        series = self.df.loc[date]
-
-        # These vars hold the values in row 0 of the expanded DataFrame.
-        op = series['Open']
-        hi = series['High']
-        lo = series['Low']
-        cl = series['Close']
-
-        price_base = lo
-        price_range = hi - lo
-
-        minutes_start =  9 * 60 + 30  #  9:30
-        minutes_end   = 16 * 60       # 16:00
-
-        def fmt_index(date, minutes):
-            hh = int(minutes / 60)
-            mm = minutes % 60
-            return f"{date} {hh:02}:{mm:02}:00"
-
-        index = [fmt_index(date,m) for m in range(minutes_start, minutes_end, interval)]
-        entries = len(index)
-
-        op_values = [ round(price_base + price_range * self.rng.random(), rounding) for i in range(entries) ]
-        hi_values = [ round(price_base + price_range * self.rng.random(), rounding) for i in range(entries) ]
-        lo_values = [ round(price_base + price_range * self.rng.random(), rounding) for i in range(entries) ]
-        cl_values = [ round(price_base + price_range * self.rng.random(), rounding) for i in range(entries) ]
-
-        # This is kind of a cheat, but has the nice property that the original
-        # input row is preserved in the first output row of the expanded dataframe.
-        op_values[0] = round(op, rounding)
-        hi_values[0] = round(hi, rounding)
-        lo_values[0] = round(lo, rounding)
-        cl_values[0] = round(cl, rounding)
-
-        df = pd.DataFrame(index=index,
-                          data={'symbol':[self.name]*entries,
-                                'open': op_values,
-                                'high': hi_values,
-                                'low': lo_values,
-                                'close': cl_values})
-        df.index.name = 'ts'
-        return [True, df]
 
 class StockIterator:
     def __init__(self, stock):
@@ -236,7 +267,7 @@ def make_argparser(cmd):
             "",
             "Defaults:",
             f"  INTERVAL = {DEFAULT_INTERVAL}",
-            f"  DIGITS   = {DEFAULT_DIGITS}",
+            f"  DIGITS   = {DEFAULT_ROUNDING}",
         ]))
 
     grp = ap.add_argument_group(title="Help/Debug")
@@ -249,11 +280,7 @@ def make_argparser(cmd):
     grp = ap.add_argument_group(title="Select stock symbols")
     grp.add_argument("-s", nargs="+", metavar="SYM", dest="names", help="pick stocks")
 
-    grp = ap.add_argument_group(title="Quote interval")
-    grp.add_argument("-i", type=int, dest="interval", default=DEFAULT_INTERVAL,
-                     help="minute interval (see below)")
-
-    grp = ap.add_argument_group(title="Selecting which rows to emit")
+    grp = ap.add_argument_group(title="Start/stop dates")
     grp.add_argument("-b", dest="base_date",
                      help="set base date (YYYY, YYYY-MM, or YYYY-MM-DD)")
     grp.add_argument("-m",action='store_true', dest="count_by_months", help="count by months (instead of days)")
@@ -262,12 +289,20 @@ def make_argparser(cmd):
     grp.add_argument("-c", type=int, dest="count", default=1,
                      help="number of days (or months) to output")
 
-    grp = ap.add_argument_group(title="Output row order")
+    grp = ap.add_argument_group(title="Quote interval")
+    grp.add_argument("-i", type=int, dest="interval", default=DEFAULT_INTERVAL,
+                     help="minute interval (see below)")
+
+    grp = ap.add_argument_group(title="Random seed")
+    grp.add_argument("-S", type=int, dest="seed", default=DEFAULT_SEED,
+                     help="set randome number generator seed")
+
+    grp = ap.add_argument_group(title="Order of output rows")
     grp.add_argument("-k", nargs="*", metavar="KEY", dest="sort_keys",
                      help="set sort keys (use column names of output table)")
 
     grp = ap.add_argument_group(title="Output formats")
-    grp.add_argument("-r", type=int, dest="digits", default=DEFAULT_DIGITS,
+    grp.add_argument("-r", type=int, dest="digits", default=DEFAULT_ROUNDING,
                      help="number of digits after decimal for dollar amounts")
     grp.add_argument("-f", dest="format", choices=['json','csv','pretty'], default='pretty',
                      help="set output format")
@@ -275,8 +310,10 @@ def make_argparser(cmd):
     return ap
 
 def main(args):
+
     global op
-    ap = make_argparser(args[0])
+
+    ap = make_argparser(os.path.basename(args[0]))
     op = ap.parse_args(args[1:])
 
     if op.help:
@@ -322,6 +359,8 @@ def main(args):
             pass
         return 0
 
+    rng = np.random.default_rng(op.seed)
+
     # Use pandas to parse date. It will convert 2020 to 2020-01-01, and 2020-04
     # to 2020-04-01.  Then compute start and end date. If counting by months,
     # insist that start date is a first day of month, otherwise it gets messy
@@ -348,19 +387,13 @@ def main(args):
 
     start_date = f"{start_date_ts.year}-{start_date_ts.month:02}-{start_date_ts.day:02}"
     end_date = f"{end_date_ts.year}-{end_date_ts.month:02}-{end_date_ts.day:02}"
-    #print(f"Start: {start_date}")
-    #print(f"End:   {end_date}")
-
-    first_start_date = min([s.start_date() for s in selected_stocks])
-    last_end_date = max([s.end_date() for s in selected_stocks])
 
     df_list = []
     for s in selected_stocks:
         it = StockIterator(s)
         it.seek(start_date)
         while not it.eof() and it.item()['Date'] < end_date:
-            #print(f"expand {s.name:4} {it.item().tolist()}")
-            have_data, df = s.expand(s.start_date(), op.interval, op.digits)
+            have_data, df = expand(s.name, it.item(), op.interval, op.digits, rng, True)
             if have_data:
                 df_list.append(df)
                 pass
@@ -368,12 +401,14 @@ def main(args):
             pass
         pass
 
+    if len(df_list) == 0:
+        return 0
+
     # concat the list into one df
     df = pd.concat([df.reset_index() for df in df_list])
 
     # add a column of random values
-    rng = np.random.default_rng(314159)
-    df['random'] = rng.random(size=len(df.index))
+    df['random'] = rng.integers(low=0,high=0xffffffff, size=len(df.index))
 
     # sort
     if op.sort_keys == None or len(op.sort_keys) == 0:

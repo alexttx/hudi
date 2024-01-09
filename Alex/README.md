@@ -16,40 +16,39 @@ mvn clean package -Pintegration-tests -DskipTests -Dspark2.4 -Dscala-2.11
 
 Bring up cluster:
 ```
-cd docker
-sudo ./setup_demo.sh
+cd Alex
+../docker/setup_demo.sh
 ```
 
 Load some data into Kafka and verify:
 ```
-yyyy=2020
-dd=1
-mm=1
-hh=9
-./stock_ticker.py -y $yyyy -d $dd -m $mm -t $hh | kcat -b kafkabroker -t stock_ticks -P
+offset=0   # start at day 0
+count=15   # produce 15 days of data
+interval=5 # stock quotes every 5 minutes
+./stock_ticker -b 2019 -o $offset -c $count -i $interval -f json | kcat -b kafkabroker -t stock_ticks -P
 kcat -b kafkabroker -L -J | jq -C .
 ```
 
-Ingest from Kafkaa to COW and MOR tables in HDFS
+Ingest from Kafka to COW and MOR tables in HDFS
 ```
-sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-cow.sh
-sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-mor.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-cow.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-mor.sh
 ```
 
 See tables in HDFS:
 ```
-sudo docker exec -it adhoc-1 hadoop --config /etc/hadoop fs -ls -R -h /user/hive/warehouse/stock\*/$yyyy
+docker exec -it adhoc-1 hadoop --config /etc/hadoop fs -ls -R -h /user/hive/warehouse/stock\*/2\*
 ```
 
 Sync COW and MOR tables with Hive:
 ```
-sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/sync-cow.sh
-sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/sync-mor.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/sync-cow.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/sync-mor.sh
 ```
 
 Run Hive queries:
 ```
-sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/hive-queries.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/hive-queries.sh
 ```
 
 Load next batch of data into Kafka:
@@ -61,13 +60,13 @@ kcat -b kafkabroker -L -J | jq -C .
 
 Ingest into HDFS:
 ```
-sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-cow.sh
-sudo docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-mor.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-cow.sh
+docker exec -it adhoc-1 /var/hoodie/ws/Alex/ingest-mor.sh
 ```
 
 See data in HDFS, there are now two parque files per table:
 ```
-sudo docker exec -it adhoc-1 hadoop --config /etc/hadoop fs -ls -R -h /user/hive/warehouse/stock\*/$yyyy
+docker exec -it adhoc-1 hadoop --config /etc/hadoop fs -ls -R -h /user/hive/warehouse/stock\*/$yyyy
 ```
 
 
