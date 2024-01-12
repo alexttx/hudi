@@ -589,6 +589,7 @@ public class HoodieStreamer implements Serializable {
     }
 
     try {
+      LOG.info("XXX HoodieStreamer main()");
       new HoodieStreamer(cfg, jssc).sync();
     } finally {
       jssc.stop();
